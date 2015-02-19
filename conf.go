@@ -9,6 +9,33 @@ import (
 	"time"
 )
 
+var (
+	minRequired = []string{
+		VersionKey,
+		AlgorithmKey,
+		DomainKey,
+		SelectorKey,
+		CanonicalizationKey,
+		QueryMethodKey,
+		TimestampKey,
+	}
+	keyOrder = []string{
+		VersionKey,
+		AlgorithmKey,
+		CanonicalizationKey,
+		DomainKey,
+		QueryMethodKey,
+		SelectorKey,
+		TimestampKey,
+		BodyHashKey,
+		FieldsKey,
+		CopiedFieldsKey,
+		AUIDKey,
+		BodyLengthKey,
+		SignatureDataKey,
+	}
+)
+
 type Conf map[string]string
 
 const (
@@ -54,15 +81,6 @@ func NewConf(domain string, selector string) (Conf, error) {
 }
 
 func (c Conf) Validate() error {
-	minRequired := []string{
-		VersionKey,
-		AlgorithmKey,
-		DomainKey,
-		SelectorKey,
-		CanonicalizationKey,
-		QueryMethodKey,
-		TimestampKey,
-	}
 	for _, v := range minRequired {
 		if _, ok := c[v]; !ok {
 			return fmt.Errorf("key '%s' missing", v)
@@ -102,21 +120,6 @@ func (c Conf) RelaxedBody() bool {
 }
 
 func (c Conf) String() string {
-	keyOrder := []string{
-		VersionKey,
-		AlgorithmKey,
-		CanonicalizationKey,
-		DomainKey,
-		QueryMethodKey,
-		SelectorKey,
-		TimestampKey,
-		BodyHashKey,
-		FieldsKey,
-		CopiedFieldsKey,
-		AUIDKey,
-		BodyLengthKey,
-		SignatureDataKey,
-	}
 	pairs := make([]string, 0, len(keyOrder))
 	for _, k := range keyOrder {
 		v, ok := c[k]
