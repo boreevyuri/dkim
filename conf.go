@@ -56,7 +56,10 @@ const (
 )
 
 const (
-	AlgorithmSHA256 = "rsa-sha256"
+	AlgorithmSHA256         = "rsa-sha256"
+	DefaultVersion          = "1"
+	DefaultCanonicalization = "relaxed/simple"
+	DefaultQueryMethod      = "dns/txt"
 )
 
 func NewConf(domain string, selector string) (Conf, error) {
@@ -67,64 +70,61 @@ func NewConf(domain string, selector string) (Conf, error) {
 		return nil, fmt.Errorf("selector invalid")
 	}
 	return Conf{
-		VersionKey:          "1",
+		VersionKey:          DefaultVersion,
 		AlgorithmKey:        AlgorithmSHA256,
 		DomainKey:           domain,
 		SelectorKey:         selector,
-		CanonicalizationKey: "relaxed/simple",
-		QueryMethodKey:      "dns/txt",
+		CanonicalizationKey: DefaultCanonicalization,
+		QueryMethodKey:      DefaultQueryMethod,
 		TimestampKey:        strconv.FormatInt(time.Now().Unix(), 10),
-		FieldsKey:           "",
-		BodyHashKey:         "",
-		SignatureDataKey:    "",
+		FieldsKey:           Empty,
+		BodyHashKey:         Empty,
+		SignatureDataKey:    Empty,
 	}, nil
 }
 
-func (c Conf) Validate() error {
-	for _, v := range minRequired {
-		if _, ok := c[v]; !ok {
-			return fmt.Errorf("key '%s' missing", v)
+func (this Conf) Validate() error {
+	for _, key := range minRequired {
+		if _, ok := this[key]; !ok {
+			return fmt.Errorf("key '%s' missing", key)
 		}
 	}
 	return nil
 }
 
-func (c Conf) Algorithm() string {
-	if a := c[AlgorithmKey]; a != "" {
-		return a
+func (this Conf) Algorithm() string {
+	if algorithm := this[AlgorithmKey]; algorithm != Empty {
+		return algorithm
 	}
 	return AlgorithmSHA256
 }
 
-func (c Conf) Hash() crypto.Hash {
-	if c.Algorithm() == AlgorithmSHA256 {
+func (this Conf) Hash() crypto.Hash {
+	if this.Algorithm() == AlgorithmSHA256 {
 		return crypto.SHA256
 	}
 	panic("algorithm not implemented")
 }
 
-func (c Conf) RelaxedHeader() bool {
-	can := strings.ToLower(c[CanonicalizationKey])
-	if strings.HasPrefix(can, "relaxed") {
+func (this Conf) RelaxedHeader() bool {
+	if strings.HasPrefix(strings.ToLower(this[CanonicalizationKey]), "relaxed") {
 		return true
 	}
 	return false
 }
 
-func (c Conf) RelaxedBody() bool {
-	can := strings.ToLower(c[CanonicalizationKey])
-	if strings.HasSuffix(can, "/relaxed") {
+func (this Conf) RelaxedBody() bool {
+	if strings.HasSuffix(strings.ToLower(this[CanonicalizationKey]), "/relaxed") {
 		return true
 	}
 	return false
 }
 
-func (c Conf) String() string {
+func (this Conf) String() string {
 	pairs := make([]string, 0, len(keyOrder))
-	for _, k := range keyOrder {
-		v, ok := c[k]
-		if ok {
-			pairs = append(pairs, k+"="+v)
+	for _, key := range keyOrder {
+		if value, ok := this[key]; ok {
+			pairs = append(pairs, fmt.Sprintf("%s=%s", key, value))
 		}
 	}
 	return strings.Join(pairs, "; ")
