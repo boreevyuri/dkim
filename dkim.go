@@ -165,6 +165,10 @@ func (d *DKIM) signature(msg *mail.Message) (string, error) {
 func (d *DKIM) Sign(eml []byte) ([]byte, error) {
 	msg, err := readEML(eml)
 
+	if err != nil {
+		return eml, err
+	}
+
 	body := new(bytes.Buffer)
 	body.ReadFrom(msg.Body)
 	bodyb := body.Bytes()
@@ -173,11 +177,11 @@ func (d *DKIM) Sign(eml []byte) ([]byte, error) {
 	msg.Body = body
 
 	if err != nil {
-		return EMPTY_AS_BYTE, err
+		return eml, err
 	}
 	sig, err := d.signature(msg)
 	if err != nil {
-		return EMPTY_AS_BYTE, err
+		return eml, err
 	}
 	d.conf[SignatureDataKey] = sig
 
