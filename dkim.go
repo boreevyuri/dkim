@@ -8,29 +8,30 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"net/mail"
 	"regexp"
 	"strings"
-	"fmt"
 )
 
 const (
-	CRLF  = "\r\n"
-	DOUBLE_CRLF  = "\r\n\r\n"
-	Empty = ""
-	WSP = " "
+	CRLF        = "\r\n"
+	DOUBLE_CRLF = "\r\n\r\n"
+	Empty       = ""
+	WSP         = " "
 )
 
 var (
-	CRLF_AS_BYTE = []byte{'\r', '\n'}
-	WSP_AS_BYTE = []byte{' '}
+	CRLF_AS_BYTE  = []byte{'\r', '\n'}
+	WSP_AS_BYTE   = []byte{' '}
 	EMPTY_AS_BYTE = []byte{}
+	EMPTY_SIGN_AS_BYTE = []byte("")
 )
 
 var (
-	headerRelaxRx = regexp.MustCompile(`\s+`)
-	singleWspRx = regexp.MustCompile(`[ \t]+`)
-	wspEndLineRx = regexp.MustCompile(`\s?(\r\n|\n)`)
+	headerRelaxRx    = regexp.MustCompile(`\s+`)
+	singleWspRx      = regexp.MustCompile(`[ \t]+`)
+	wspEndLineRx     = regexp.MustCompile(`\s?(\r\n|\n)`)
 	ignoreEmptyLines = regexp.MustCompile(`[ \r\n]*\z`)
 )
 
@@ -53,6 +54,7 @@ type DKIM struct {
 	signableHeaders []string
 	conf            Conf
 	privateKey      *rsa.PrivateKey
+	msgBody []byte
 }
 
 func New(conf Conf, keyPEM []byte) (d *DKIM, err error) {
@@ -63,29 +65,27 @@ func New(conf Conf, keyPEM []byte) (d *DKIM, err error) {
 	if len(keyPEM) == 0 {
 		return nil, errors.New("invalid key PEM data")
 	}
-	dkim := &DKIM{
-		signableHeaders: StdSignableHeaders,
-		conf:            conf,
-	}
 	der, _ := pem.Decode(keyPEM)
 	key, err := x509.ParsePKCS1PrivateKey(der.Bytes)
 	if err != nil {
 		return nil, err
 	}
-	dkim.privateKey = key
+	return NewByKey(conf, key), nil
+}
 
-	return dkim, nil
+func NewByKey(conf Conf, key *rsa.PrivateKey) *DKIM {
+	dkim := &DKIM{
+		signableHeaders: StdSignableHeaders,
+		conf: conf,
+	}
+	dkim.privateKey = key
+	return dkim
 }
 
 func (d *DKIM) canonicalBody(msg *mail.Message) []byte {
-	buf := new(bytes.Buffer)
-	if msg.Body != nil {
-		buf.ReadFrom(msg.Body)
-	}
-	body := buf.Bytes()
-
+	body := d.msgBody
 	if d.conf.RelaxedBody() {
-		if len(body) == 0 {
+		if len(d.msgBody) == 0 {
 			return nil
 		}
 		// Reduce WSP sequences to single WSP
@@ -102,7 +102,7 @@ func (d *DKIM) canonicalBody(msg *mail.Message) []byte {
 	}
 
 	// Ignore all empty lines at the end of the message body
-	body = ignoreEmptyLines.ReplaceAll(body, []byte(""))
+	body = ignoreEmptyLines.ReplaceAll(body, EMPTY_AS_BYTE)
 
 	return append(body, CRLF_AS_BYTE...)
 }
@@ -164,21 +164,18 @@ func (d *DKIM) signature(msg *mail.Message) (string, error) {
 
 func (d *DKIM) Sign(eml []byte) ([]byte, error) {
 	msg, err := readEML(eml)
+//	body := new(bytes.Buffer)
+//	body.ReadFrom(msg.Body)
+//	d.msgBody = body.Bytes()
+//
+//	// Replace the Reader
+//	msg.Body = body
 
 	if err != nil {
 		return eml, err
 	}
 
-	body := new(bytes.Buffer)
-	body.ReadFrom(msg.Body)
-	bodyb := body.Bytes()
-
-	// Replace the Reader
-	msg.Body = body
-
-	if err != nil {
-		return eml, err
-	}
+	d.readBody(msg)
 	sig, err := d.signature(msg)
 	if err != nil {
 		return eml, err
@@ -201,7 +198,13 @@ func (d *DKIM) Sign(eml []byte) ([]byte, error) {
 	buf.WriteString(":")
 	buf.WriteString(d.conf.String())
 	buf.WriteString(DOUBLE_CRLF)
-	buf.Write(bodyb)
+	buf.Write(d.msgBody)
 
 	return buf.Bytes(), nil
+}
+
+func (d *DKIM) readBody(msg *mail.Message) {
+	body := new(bytes.Buffer)
+	body.ReadFrom(msg.Body)
+	d.msgBody = body.Bytes()
 }

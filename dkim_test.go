@@ -93,8 +93,8 @@ func TestCanonicalBody(t *testing.T) {
 	conf, _ := NewConf("domain", "selector")
 	conf[CanonicalizationKey] = "relaxed/relaxed"
 	dkim, _ = New(conf, dkimSamplePEMData)
-
 	msg, _ = readEML([]byte(dkimSampleEML1))
+	dkim.readBody(msg)
 	if x := string(dkim.canonicalBody(msg)); x != " C\r\nD E\r\n" {
 		t.Fatal(x)
 	}
@@ -106,12 +106,14 @@ func TestCanonicalBody(t *testing.T) {
 	}
 
 	msg, _ = readEML([]byte(dkimSampleEML2))
+	dkim.readBody(msg)
 	conf[CanonicalizationKey] = "relaxed/simple"
 	if x := string(dkim.canonicalBody(msg)); x != "Hi.\r\n\r\nWe lost the game. Are you hungry yet?\r\n\r\nJoe.\r\n" {
 		t.Fatal(x)
 	}
 
 	msg, _ = readEML([]byte(dkimSampleEML3))
+	dkim.readBody(msg)
 	conf[CanonicalizationKey] = "relaxed/relaxed"
 	if x := string(dkim.canonicalBody(msg)); x != "This is the body of the message.=0D=0AThis is the second line\r\n" {
 		t.Fatal(x)
@@ -126,12 +128,14 @@ func TestCanonicalBodyHash(t *testing.T) {
 
 	msg, _ := readEML([]byte(dkimSampleEML2))
 	enc := base64.StdEncoding
+	dkim.readBody(msg)
 	if x := enc.EncodeToString(dkim.canonicalBodyHash(msg)); x != "2jUSOH9NhtVGCQWNr9BrIAPreKQjO6Sn7XIkfJVOzv8=" {
 		t.Fatal(x)
 	}
 
 	msg, _ = readEML([]byte(dkimSampleEML3))
 	conf[CanonicalizationKey] = "relaxed/relaxed"
+	dkim.readBody(msg)
 	if x := enc.EncodeToString(dkim.canonicalBodyHash(msg)); x != "vrfP/4tQvd9QIewLlBjIlqsKMPwXXKj66neZg/smWSc=" {
 		t.Fatal(x)
 	}
@@ -140,6 +144,7 @@ func TestCanonicalBodyHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	dkim.readBody(msg)
 
 	// Simple canonical empty body
 	conf[CanonicalizationKey] = "relaxed/simple"
@@ -170,7 +175,9 @@ func dkimSignable() *DKIM {
 
 func TestSignableHeaderBlock(t *testing.T) {
 	msg, _ := readEML([]byte(dkimSampleEML3))
-	block := dkimSignable().signableHeaderBlock(msg)
+	dkim := dkimSignable()
+	dkim.readBody(msg)
+	block := dkim.signableHeaderBlock(msg)
 	expect := "content-type:text/plain; charset=us-ascii\r\n" +
 		"from:aws@s3ig.com\r\n" +
 		"subject:dkim test email\r\n" +
@@ -188,7 +195,9 @@ func TestSignableHeaderBlock(t *testing.T) {
 
 func TestSignature(t *testing.T) {
 	msg, _ := readEML([]byte(dkimSampleEML3))
-	sig, err := dkimSignable().signature(msg)
+	dkim := dkimSignable()
+	dkim.readBody(msg)
+	sig, err := dkim.signature(msg)
 	if err != nil {
 		t.Fatal("error not nil", err)
 	}

@@ -83,47 +83,47 @@ func NewConf(domain string, selector string) (Conf, error) {
 	}, nil
 }
 
-func (this Conf) Validate() error {
+func (c Conf) Validate() error {
 	for _, key := range minRequired {
-		if _, ok := this[key]; !ok {
+		if _, ok := c[key]; !ok {
 			return fmt.Errorf("key '%s' missing", key)
 		}
 	}
 	return nil
 }
 
-func (this Conf) Algorithm() string {
-	if algorithm := this[AlgorithmKey]; algorithm != Empty {
+func (c Conf) Algorithm() string {
+	if algorithm := c[AlgorithmKey]; algorithm != Empty {
 		return algorithm
 	}
 	return AlgorithmSHA256
 }
 
-func (this Conf) Hash() crypto.Hash {
-	if this.Algorithm() == AlgorithmSHA256 {
+func (c Conf) Hash() crypto.Hash {
+	if c.Algorithm() == AlgorithmSHA256 {
 		return crypto.SHA256
 	}
 	panic("algorithm not implemented")
 }
 
-func (this Conf) RelaxedHeader() bool {
-	if strings.HasPrefix(strings.ToLower(this[CanonicalizationKey]), "relaxed") {
+func (c Conf) RelaxedHeader() bool {
+	if strings.HasPrefix(strings.ToLower(c[CanonicalizationKey]), "relaxed") {
 		return true
 	}
 	return false
 }
 
-func (this Conf) RelaxedBody() bool {
-	if strings.HasSuffix(strings.ToLower(this[CanonicalizationKey]), "/relaxed") {
+func (c Conf) RelaxedBody() bool {
+	if strings.HasSuffix(strings.ToLower(c[CanonicalizationKey]), "/relaxed") {
 		return true
 	}
 	return false
 }
 
-func (this Conf) String() string {
+func (c Conf) String() string {
 	pairs := make([]string, 0, len(keyOrder))
 	for _, key := range keyOrder {
-		if value, ok := this[key]; ok {
+		if value, ok := c[key]; ok {
 			pairs = append(pairs, fmt.Sprintf("%s=%s", key, value))
 		}
 	}
